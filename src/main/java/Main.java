@@ -1,4 +1,5 @@
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -15,9 +16,17 @@ public class Main {
       serverSocket.setReuseAddress(true);
       clientSocket = serverSocket.accept();
 
+      InputStream in = clientSocket.getInputStream();
       OutputStream out = clientSocket.getOutputStream();
-      out.write("+PONG\r\n".getBytes());
-      out.flush();
+
+      while (true) {
+        String line = readLine(in);
+        if (line == null) break;
+        if (line.equals("PING")) {
+          out.write("+PONG\r\n".getBytes());
+          out.flush();
+        }
+      }
 
     } catch (IOException e) {
       System.out.println("IOException: " + e.getMessage());
@@ -31,4 +40,20 @@ public class Main {
       }
     }
   }
+  
+
+ private static String readLine(InputStream in) throws IOException {
+    StringBuilder sb = new StringBuilder();
+    int prev = -1, curr;
+    while ((curr = in.read()) != -1) {
+      if (prev == '\r' && curr == '\n') {
+        sb.setLength(sb.length() - 1);
+        return sb.toString();
+      }
+      sb.append((char) curr);
+      prev = curr;
+    }
+    return sb.length() == 0 ? null : sb.toString();
+  }
+}
 }
