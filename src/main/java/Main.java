@@ -5,12 +5,14 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Main {
   public static void main(String[] args) {
     ServerSocket serverSocket = null;
     Socket clientSocket = null;
     int port = 6379;
+    ConcurrentHashMap<String, String> mp = new ConcurrentHashMap<>();
     try {
       serverSocket = new ServerSocket(port);
       // Since the tester restarts your program quite often, setting SO_REUSEADDR
@@ -20,7 +22,7 @@ public class Main {
       while(true){
         clientSocket = serverSocket.accept();
         Socket newSocket = clientSocket;
-        Thread t1 = new Thread(() -> handleClient(newSocket));
+        Thread t1 = new Thread(() -> handleClient(newSocket, mp));
         t1.start();
       }
     } catch (IOException e) {
@@ -36,7 +38,7 @@ public class Main {
     }
   }
   
-  public static void handleClient(Socket clientSocket) {
+  public static void handleClient(Socket clientSocket, ConcurrentHashMap<String, String> mp) {
     try (InputStream in = clientSocket.getInputStream();
          OutputStream out = clientSocket.getOutputStream()) {
       while (true) {
@@ -56,6 +58,28 @@ public class Main {
             String resp = "$" + message.length() + "\r\n" + message + "\r\n";
             out.write(resp.getBytes());
             out.flush();
+          }
+          case "SET" -> {
+            String key = commands.get(1);
+            String value = commands.get(2);
+            mp.put(key, value);
+            String resp = "+OK\r\n";
+            out.write(resp.getBytes());
+            out.flush();
+          }
+          case "GET" -> {
+            String key = commands.get(1);
+            if(mp.containsKey(key)){
+              String value = mp.get(key);
+              String resp = "$" + value.length() + "\r\n" + value + "\r\n";
+              out.write(resp.getBytes());
+              out.flush();
+            }
+            else{
+              String resp = "$-1\r\n";
+              out.write(resp.getBytes());
+              out.flush();
+            }
           }
           default -> {
             out.write(("-ERR unknown command '" + cmd + "'\r\n").getBytes());
