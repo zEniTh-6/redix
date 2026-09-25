@@ -14,20 +14,13 @@ public class Main {
       // Since the tester restarts your program quite often, setting SO_REUSEADDR
       // ensures that we don't run into 'Address already in use' errors
       serverSocket.setReuseAddress(true);
-      clientSocket = serverSocket.accept();
 
-      InputStream in = clientSocket.getInputStream();
-      OutputStream out = clientSocket.getOutputStream();
-
-      while (true) {
-        String line = readLine(in);
-        if (line == null) break;
-        if (line.equals("PING")) {
-          out.write("+PONG\r\n".getBytes());
-          out.flush();
-        }
+      while(true){
+        clientSocket = serverSocket.accept();
+        Socket newSocket = clientSocket;
+        Thread t1 = new Thread(() -> handleClient(newSocket));
+        t1.start();
       }
-
     } catch (IOException e) {
       System.out.println("IOException: " + e.getMessage());
     } finally {
@@ -41,8 +34,25 @@ public class Main {
     }
   }
   
+  private static void handleClient(Socket clientSocket) {
+      try (InputStream in = clientSocket.getInputStream();
+           OutputStream out = clientSocket.getOutputStream()) {
+        while (true) {
+          String line = readLine(in);
+          if (line == null) break;
+          if (line.equals("PING")) {
+            out.write("+PONG\r\n".getBytes());
+            out.flush();
+          }
+        }
+      } catch (IOException e) {
+        System.out.println("IOException: " + e.getMessage());
+      } finally {
+        try { clientSocket.close(); } catch (IOException ignored) {}
+      }
+  }
 
- private static String readLine(InputStream in) throws IOException {
+  private static String readLine(InputStream in) throws IOException {
     StringBuilder sb = new StringBuilder();
     int prev = -1, curr;
     while ((curr = in.read()) != -1) {
@@ -55,5 +65,4 @@ public class Main {
     }
     return sb.length() == 0 ? null : sb.toString();
   }
-}
 }
