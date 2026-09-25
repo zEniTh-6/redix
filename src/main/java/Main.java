@@ -1,4 +1,5 @@
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 
@@ -13,6 +14,11 @@ public class Main {
       // ensures that we don't run into 'Address already in use' errors
       serverSocket.setReuseAddress(true);
       clientSocket = serverSocket.accept();
+
+      OutputStream out = clientSocket.getOutputStream();
+      out.write("+PONG\r\n".getBytes());
+      out.flush();
+
     } catch (IOException e) {
       System.out.println("IOException: " + e.getMessage());
     } finally {
