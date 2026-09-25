@@ -3,6 +3,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Main {
   public static void main(String[] args) {
@@ -34,22 +36,59 @@ public class Main {
     }
   }
   
-  private static void handleClient(Socket clientSocket) {
-      try (InputStream in = clientSocket.getInputStream();
-           OutputStream out = clientSocket.getOutputStream()) {
-        while (true) {
-          String line = readLine(in);
-          if (line == null) break;
-          if (line.equals("PING")) {
+  public static void handleClient(Socket clientSocket) {
+    try (InputStream in = clientSocket.getInputStream();
+         OutputStream out = clientSocket.getOutputStream()) {
+      while (true) {
+        List<String> commands = parser(in);
+        // client closed connection
+        if (commands == null) break; 
+        if (commands.isEmpty()) continue; 
+
+        String cmd = commands.get(0).toUpperCase();
+        switch (cmd) {
+          case "PING" -> {
             out.write("+PONG\r\n".getBytes());
             out.flush();
           }
+          case "ECHO" -> {
+            String message = commands.get(1);
+            String resp = "$" + message.length() + "\r\n" + message + "\r\n";
+            out.write(resp.getBytes());
+            out.flush();
+          }
+          default -> {
+            out.write(("-ERR unknown command '" + cmd + "'\r\n").getBytes());
+            out.flush();
+          }
         }
-      } catch (IOException e) {
-        System.out.println("IOException: " + e.getMessage());
-      } finally {
-        try { clientSocket.close(); } catch (IOException ignored) {}
       }
+    } catch (IOException e) {
+      System.out.println("IOException: " + e.getMessage());
+    } finally {
+      try { clientSocket.close(); } catch (IOException ignored) {}
+    }
+  }
+
+  // Reads one full RESP array command (*N\r\n $len\r\n data\r\n ... ) and
+  // returns its elements as tokens. 
+  private static List<String> parser(InputStream in) throws IOException {
+    String header = readLine(in);
+    if (header == null) return null;
+    if (!header.startsWith("*")) return new ArrayList<>();
+
+    int num_of_args = Integer.parseInt(header.substring(1));
+    List<String> cmds = new ArrayList<>(num_of_args);
+    for (int i = 0; i < num_of_args; i++) {
+      // read the length of command 1st as per the RESP format.
+      String len_of_cmd = readLine(in); 
+      if (len_of_cmd == null || !len_of_cmd.startsWith("$")) return new ArrayList<>();
+      // now the actual command.
+      String value = readLine(in);         
+      if (value == null) return new ArrayList<>();
+      cmds.add(value);
+    }
+    return cmds;
   }
 
   private static String readLine(InputStream in) throws IOException {
