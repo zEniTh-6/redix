@@ -9,14 +9,16 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Main {
-
+  private static final String OK = "+OK\r\n";
+  private static final String NO_VALUE = "$-1\r\n";
+  private static final String END = "\r\n";
   public static void main(String[] args) {
     ServerSocket serverSocket = null;
     Socket clientSocket = null;
     int port = 6379;
     ConcurrentHashMap<String, String> mp = new ConcurrentHashMap<>();
     ConcurrentHashMap<String, Long> ex_mp = new ConcurrentHashMap<>();
-    LinkedList<String> list = new LinkedList<>();
+    ConcurrentHashMap<String, LinkedList<String>> list_mp = new ConcurrentHashMap<>();
     try {
       serverSocket = new ServerSocket(port);
       // Since the tester restarts your program quite often, setting SO_REUSEADDR
@@ -26,7 +28,7 @@ public class Main {
       while (true) {
         clientSocket = serverSocket.accept();
         Socket newSocket = clientSocket;
-        Thread t1 = new Thread(() -> handleClient(newSocket, mp, ex_mp));
+        Thread t1 = new Thread(() -> handleClient(newSocket, mp, ex_mp, list_mp));
         t1.start();
       }
     } catch (IOException e) {
@@ -43,7 +45,7 @@ public class Main {
   }
 
   public static void handleClient(Socket clientSocket, ConcurrentHashMap<String, String> mp,
-      ConcurrentHashMap<String, Long> ex_mp) {
+      ConcurrentHashMap<String, Long> ex_mp, ConcurrentHashMap<String, LinkedList<String>> list_mp) {
     try (InputStream in = clientSocket.getInputStream();
         OutputStream out = clientSocket.getOutputStream()) {
       while (true) {
@@ -62,7 +64,7 @@ public class Main {
           }
           case "ECHO" -> {
             String message = commands.get(1);
-            String resp = "$" + message.length() + "\r\n" + message + "\r\n";
+            String resp = "$" + message.length() + END  + message + END;
             out.write(resp.getBytes());
             out.flush();
           }
@@ -73,7 +75,6 @@ public class Main {
             if (commands.size() > 3) {
               String fn = commands.get(3).toUpperCase();
               long timer = 0;
-
 
               switch (fn) {
                 case "EX" -> {
@@ -87,8 +88,7 @@ public class Main {
                   long exp_time = System.currentTimeMillis() + timer * 1000;
                   mp.put(key, value);
                   ex_mp.put(key, exp_time);
-                  String resp = "+OK\r\n";
-                  out.write(resp.getBytes());
+                  out.write(OK.getBytes());
                   out.flush();
                 }
                 case "PX" -> {
@@ -102,44 +102,40 @@ public class Main {
                   long exp_time = System.currentTimeMillis() + timer;
                   mp.put(key, value);
                   ex_mp.put(key, exp_time);
-                  String resp = "+OK\r\n";
-                  out.write(resp.getBytes());
+                  out.write(OK.getBytes());
                   out.flush();
                 }
+                // --------------------------------FIX THE NX AND XX COMMANDS
+                // ---------------------------------- //
                 case "NX" -> {
                   if (!mp.containsKey(key)) {
                     mp.put(key, value);
-                    String resp = "+OK\r\n";
-                    out.write(resp.getBytes());
+                    out.write(OK.getBytes());
                     out.flush();
                   } else {
-                    String resp = "$-1\r\n";
-                    out.write(resp.getBytes());
+                    out.write(NO_VALUE.getBytes());
                     out.flush();
                   }
                 }
                 case "XX" -> {
                   if (mp.containsKey(key)) {
                     mp.put(key, value);
-                    String resp = "+OK\r\n";
-                    out.write(resp.getBytes());
+                    out.write(OK.getBytes());
                     out.flush();
                   } else {
-                    String resp = "$-1\r\n";
-                    out.write(resp.getBytes());
+                    out.write(NO_VALUE.getBytes());
                     out.flush();
                   }
                 }
                 default -> {
-                  out.write(("-ERR unknown command '" + fn + "'\r\n").getBytes());
+                  out.write(("-ERR unknown command " + fn + END).getBytes());
                   out.flush();
                 }
               }
             } else {
               ex_mp.remove(key);
               mp.put(key, value);
-              String resp = "+OK\r\n";
-              out.write(resp.getBytes());
+              out.write(OK.getBytes());
               out.flush();
             }
           }
@@ -148,22 +144,52 @@ public class Main {
             if (ex_mp.containsKey(key) && System.currentTimeMillis() > ex_mp.get(key)) {
               mp.remove(key);
               ex_mp.remove(key);
-              String resp = "$-1\r\n";
-              out.write(resp.getBytes());
+              out.write(NO_VALUE.getBytes());
               out.flush();
             } else if (mp.containsKey(key)) {
               String value = mp.get(key);
-              String resp = "$" + value.length() + "\r\n" + value + "\r\n";
+              String resp = "$" + value.length() + END + value + END;
               out.write(resp.getBytes());
               out.flush();
             } else {
-              String resp = "$-1\r\n";
-              out.write(resp.getBytes());
+              out.write(NO_VALUE.getBytes());
               out.flush();
             }
           }
+          case "RPUSH" -> {
+            String l_name = commands.get(1);
+            LinkedList<String> list = list_mp.get(l_name);
+
+            if (list == null){
+              list = new LinkedList<>();
+              list_mp.put(l_name, list);
+            }
+            // accept multiple values
+            for(int i = 2; i < commands.size(); i++) {
+              String value = commands.get(i);
+              list.addLast(value);
+            }
+            out.write((":" + list.size() + END).getBytes());
+            out.flush();
+          }
+          case "LPUSH" -> {
+            String l_name = commands.get(1);
+            LinkedList<String> list = list_mp.get(l_name);
+
+            if (list == null){
+              list = new LinkedList<>();
+              list_mp.put(l_name, list);
+            }
+            // accept multiple values
+            for(int i = 2; i < commands.size(); i++) {
+              String value = commands.get(i);
+              list.addFirst(value);
+            }
+            out.write((":" + list.size() + END).getBytes());
+            out.flush();
+          }
           default -> {
-            out.write(("-ERR unknown command '" + cmd + "'\r\n").getBytes());
+            out.write(("-ERR unknown command " + cmd + END).getBytes());
             out.flush();
           }
         }
@@ -200,9 +226,10 @@ public class Main {
       int len = Integer.parseInt(len_of_cmd.substring(1));
       StringBuilder sb = new StringBuilder();
       int curr;
-      for(int j = 0; j < len; j++){
+      for (int j = 0; j < len; j++) {
         curr = in.read();
-        if(curr == -1) return new ArrayList<>();
+        if (curr == -1)
+          return new ArrayList<>();
         sb.append((char) curr);
       }
       String resp_end = readLine(in);
