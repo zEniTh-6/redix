@@ -4,6 +4,7 @@ import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -15,6 +16,7 @@ public class Main {
     int port = 6379;
     ConcurrentHashMap<String, String> mp = new ConcurrentHashMap<>();
     ConcurrentHashMap<String, Long> ex_mp = new ConcurrentHashMap<>();
+    LinkedList<String> list = new LinkedList<>();
     try {
       serverSocket = new ServerSocket(port);
       // Since the tester restarts your program quite often, setting SO_REUSEADDR
@@ -71,7 +73,7 @@ public class Main {
             if (commands.size() > 3) {
               String fn = commands.get(3).toUpperCase();
               long timer = 0;
-              
+
 
               switch (fn) {
                 case "EX" -> {
@@ -188,14 +190,23 @@ public class Main {
     int num_of_args = Integer.parseInt(header.substring(1));
     List<String> cmds = new ArrayList<>(num_of_args);
     for (int i = 0; i < num_of_args; i++) {
+
       // read the length of command 1st as per the RESP format.
       String len_of_cmd = readLine(in);
       if (len_of_cmd == null || !len_of_cmd.startsWith("$"))
         return new ArrayList<>();
+
       // now the actual command.
-      String value = readLine(in);
-      if (value == null)
-        return new ArrayList<>();
+      int len = Integer.parseInt(len_of_cmd.substring(1));
+      StringBuilder sb = new StringBuilder();
+      int curr;
+      for(int j = 0; j < len; j++){
+        curr = in.read();
+        if(curr == -1) return new ArrayList<>();
+        sb.append((char) curr);
+      }
+      String resp_end = readLine(in);
+      String value = sb.toString();
       cmds.add(value);
     }
     return cmds;
