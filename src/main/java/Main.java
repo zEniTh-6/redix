@@ -7,11 +7,13 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 public class Main {
   private static final String OK = "+OK\r\n";
   private static final String NO_VALUE = "$-1\r\n";
   private static final String END = "\r\n";
+
   public static void main(String[] args) {
     ServerSocket serverSocket = null;
     Socket clientSocket = null;
@@ -64,7 +66,7 @@ public class Main {
           }
           case "ECHO" -> {
             String message = commands.get(1);
-            String resp = "$" + message.length() + END  + message + END;
+            String resp = "$" + message.length() + END + message + END;
             out.write(resp.getBytes());
             out.flush();
           }
@@ -110,22 +112,22 @@ public class Main {
                 case "NX" -> {
                   if (!mp.containsKey(key)) {
                     mp.put(key, value);
+                    ex_mp.remove(key);
                     out.write(OK.getBytes());
-                    out.flush();
                   } else {
                     out.write(NO_VALUE.getBytes());
-                    out.flush();
                   }
+                  out.flush();
                 }
                 case "XX" -> {
                   if (mp.containsKey(key)) {
                     mp.put(key, value);
+                    ex_mp.remove(key);
                     out.write(OK.getBytes());
-                    out.flush();
                   } else {
                     out.write(NO_VALUE.getBytes());
-                    out.flush();
                   }
+                  out.flush();
                 }
                 default -> {
                   out.write(("-ERR unknown command " + fn + END).getBytes());
@@ -158,43 +160,84 @@ public class Main {
           }
           case "RPUSH" -> {
             String l_name = commands.get(1);
-            LinkedList<String> list = list_mp.get(l_name);
 
-            if (list == null){
-              list = new LinkedList<>();
-              list_mp.put(l_name, list);
+            // computeIfAbsent take a string and a function as a parameter
+            // list_mp.computeIfAbsent(l_name, new Function<String, LinkedList<String>>() {
+            // public LinkedList<String> apply(String k) {return new LinkedList<>();}});
+
+            // K is a string here
+            LinkedList<String> list = list_mp.computeIfAbsent(l_name, k -> new LinkedList<>());
+            int size;
+
+            synchronized (list) {
+              for (int i = 2; i < commands.size(); i++) {
+                list.addLast(commands.get(i));
+              }
+              size = list.size();
             }
-            // accept multiple values
-            for(int i = 2; i < commands.size(); i++) {
-              String value = commands.get(i);
-              list.addLast(value);
-            }
-            out.write((":" + list.size() + END).getBytes());
+
+            out.write((":" + size + END).getBytes());
             out.flush();
           }
           case "LPUSH" -> {
             String l_name = commands.get(1);
-            LinkedList<String> list = list_mp.get(l_name);
 
-            if (list == null){
-              list = new LinkedList<>();
-              list_mp.put(l_name, list);
+            LinkedList<String> list = list_mp.computeIfAbsent(l_name, k -> new LinkedList<>());
+            int size;
+
+            synchronized (list) {
+              for (int i = 2; i < commands.size(); i++) {
+                list.addFirst(commands.get(i));
+              }
+              size = list.size();
             }
-            // accept multiple values
-            for(int i = 2; i < commands.size(); i++) {
-              String value = commands.get(i);
-              list.addFirst(value);
-            }
-            out.write((":" + list.size() + END).getBytes());
+
+            out.write((":" + size + END).getBytes());
             out.flush();
           }
+          case "LRANGE" -> {
+            String l_name = commands.get(1);
+            int st = Integer.parseInt(commands.get(2));
+            int end = Integer.parseInt(commands.get(3));
+            List<String> value = list_mp.get(l_name);
+
+            if (value == null) {
+              out.write("*0\r\n".getBytes());
+              out.flush();
+            } else {
+              if (st < 0)
+                st = value.size() + st;
+              if (end < 0)
+                end = value.size() + end;
+              if (-st > value.size())
+                st = 0;
+
+              if (st > value.size() || st > end) {
+                out.write("*0\r\n".getBytes());
+                out.flush();
+              } else {
+                if (end >= value.size())
+                  end = value.size() - 1;
+
+                int size = end - st + 1;
+                out.write(("*" + size + END).getBytes());
+                for (int i = st; i <= end; i++) {
+                  out.write(("$" + value.get(i).length() + END + value.get(i) + END).getBytes());
+                }
+                out.flush();
+              }
+            }
+          }
+
           default -> {
             out.write(("-ERR unknown command " + cmd + END).getBytes());
             out.flush();
           }
         }
       }
-    } catch (IOException e) {
+    } catch (
+
+    IOException e) {
       System.out.println("IOException: " + e.getMessage());
     } finally {
       try {
