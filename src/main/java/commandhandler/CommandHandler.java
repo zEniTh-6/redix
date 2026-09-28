@@ -263,6 +263,30 @@ public class CommandHandler {
                 out.write(("+" + type + END).getBytes());
                 out.flush();
             }
+            case "TTL" -> {
+                String key = commands.get(1);
+                int kv_exist = kv.exists(key);
+                if (kv_exist == 1) {
+                    long result = kv.getTime(key);
+                    out.write((":" + result + END).getBytes());
+                } else {
+                    out.write((":-2" + END).getBytes());
+                }
+                out.flush();
+            }
+            case "PERSIST" -> {
+                String key = commands.get(1);
+                int result = kv.persist(key);
+                out.write((":" + result + END).getBytes());
+                out.flush();
+            }
+            case "EXPIRE" -> {
+                String key = commands.get(1);
+                long sec = Long.parseLong(commands.get(2));
+                int result = kv.setExpiry(key, sec);
+                out.write((":" + result + END).getBytes());
+                out.flush(); 
+            }
             default -> {
                 out.write(("-ERR unknown command '" + cmd + "'\r\n").getBytes());
                 out.flush();
