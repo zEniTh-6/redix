@@ -38,6 +38,7 @@ public class CommandHandler {
                 String key = commands.get(1);
                 String value = commands.get(2);
 
+                listStore.del(key);
                 if (commands.size() > 3) {
                     String fn = commands.get(3).toUpperCase();
                     long timer = 0;
@@ -98,7 +99,7 @@ public class CommandHandler {
             }
             case "GET" -> {
                 String key = commands.get(1);
-                String value = kv.get(key);
+                String value = kv.GET(key);
                 if (value == null) {
                     out.write(NO_VALUE.getBytes());
                 } else {
@@ -109,15 +110,29 @@ public class CommandHandler {
             }
             case "RPUSH" -> {
                 String l_name = commands.get(1);
-                int size = listStore.rpush(l_name, commands.subList(2, commands.size()));
-                out.write((":" + size + END).getBytes());
-                out.flush();
+
+                int exist = kv.exists(l_name);
+                if (exist == 0) {
+                    int size = listStore.rpush(l_name, commands.subList(2, commands.size()));
+                    out.write((":" + size + END).getBytes());
+                    out.flush();
+                } else {
+                    out.write(("-WRONGTYPE Operation against a key holding the wrong kind of value" + END).getBytes());
+                    out.flush();
+                }
             }
             case "LPUSH" -> {
                 String l_name = commands.get(1);
-                int size = listStore.lpush(l_name, commands.subList(2, commands.size()));
-                out.write((":" + size + END).getBytes());
-                out.flush();
+
+                int exist = kv.exists(l_name);
+                if (exist == 0) {
+                    int size = listStore.lpush(l_name, commands.subList(2, commands.size()));
+                    out.write((":" + size + END).getBytes());
+                    out.flush();
+                } else {
+                    out.write(("-WRONGTYPE Operation against a key holding the wrong kind of value" + END).getBytes());
+                    out.flush();
+                }
             }
             case "LRANGE" -> {
                 String l_name = commands.get(1);
@@ -211,6 +226,42 @@ public class CommandHandler {
                     }
                     out.flush();
                 }
+            }
+            case "DEL" -> {
+                List<String> keys = commands.subList(1, commands.size());
+                int removed = 0;
+                for (String k : keys) {
+                    removed += kv.del(k);
+                    removed += listStore.del(k);
+                }
+                out.write((":" + removed + END).getBytes());
+                out.flush();
+            }
+            case "EXISTS" -> {
+                List<String> keys = commands.subList(1, commands.size());
+                int exist = 0;
+                for (String k : keys) {
+                    exist += kv.exists(k);
+                    exist += listStore.exists(k);
+                }
+                out.write((":" + exist + END).getBytes());
+                out.flush();
+            }
+            case "TYPE" -> {
+                String key = commands.get(1);
+                String type;
+                boolean if_kv = kv.type(key);
+                boolean if_list = listStore.type(key);
+
+                if (if_kv)
+                    type = "string";
+                else if (if_list)
+                    type = "list";
+                else
+                    type = "none";
+
+                out.write(("+" + type + END).getBytes());
+                out.flush();
             }
             default -> {
                 out.write(("-ERR unknown command '" + cmd + "'\r\n").getBytes());

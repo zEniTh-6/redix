@@ -91,4 +91,27 @@ public class ListStore {
         }
         return popped;
     }
+
+    public int del(String key) {
+        int rm = 0;
+        if (list_mp.containsKey(key)) {
+            list_mp.remove(key);
+            rm++;
+        }
+        return rm;
+    }
+
+    public int exists(String key) {
+        int exist = 0;
+        if (list_mp.containsKey(key))
+            exist = 1;
+        return exist;
+    }
+
+    public boolean type(String key) {
+        boolean list = false;
+        if (list_mp.containsKey(key))
+            list = true;
+        return list;
+    }
 }
