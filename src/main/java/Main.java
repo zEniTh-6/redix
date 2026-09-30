@@ -1,3 +1,4 @@
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -16,10 +17,24 @@ public class Main {
     ServerSocket serverSocket = null;
     Socket clientSocket = null;
     int port = 6379;
-
+    
+    String dir = ".";
+    String dbfilename = "dump.rdb";
+        
+    for (int i = 0; i < args.length - 1; i++) {
+      if (args[i].equals("--dir")) {
+        dir = args[i + 1];
+      } else if (args[i].equals("--dbfilename")) {
+        dbfilename = args[i + 1];
+      }
+    }
+    
+    File RDB = new File(dir, dbfilename);
+    RDB.getParentFile().mkdirs();
+    
     KeyValueStore kv = new KeyValueStore();
     ListStore listStore = new ListStore();
-    CommandHandler commandHandler = new CommandHandler(kv, listStore);
+    CommandHandler commandHandler = new CommandHandler(kv, listStore, RDB);
 
     try {
       serverSocket = new ServerSocket(port);
