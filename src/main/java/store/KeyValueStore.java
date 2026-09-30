@@ -1,6 +1,8 @@
 package store;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
+import java.util.HashSet;
 
 public class KeyValueStore {
     private final ConcurrentHashMap<String, String> mp = new ConcurrentHashMap<>();
@@ -41,13 +43,13 @@ public class KeyValueStore {
         return mp.get(key);
     }
 
-    public int setExpiry(String key, long sec){
+    public int setExpiry(String key, long sec) {
         int result = 0;
         long exp_time = System.currentTimeMillis() + sec * 1000;
-        if(mp.containsKey(key)){
+        if (mp.containsKey(key)) {
             ex_mp.put(key, exp_time);
             result = 1;
-        } 
+        }
         return result;
     }
 
@@ -78,9 +80,9 @@ public class KeyValueStore {
         return rm;
     }
 
-    public int persist(String Key){
+    public int persist(String Key) {
         int result = 0;
-        if(ex_mp.containsKey(Key)){
+        if (ex_mp.containsKey(Key)) {
             ex_mp.remove(Key);
             result = 1;
         }
@@ -99,5 +101,15 @@ public class KeyValueStore {
         if (GET(key) != null)
             str = true;
         return str;
+    }
+
+    public Set<String> keys() {
+        Set<String> result = new HashSet<>();
+        for (String key : mp.keySet()) {
+            if (GET(key) != null) {
+                result.add(key);
+            }
+        }
+        return result;
     }
 }

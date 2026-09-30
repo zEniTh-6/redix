@@ -10,6 +10,7 @@ import commandhandler.CommandHandler;
 import resp.RespProtocol;
 import store.KeyValueStore;
 import store.ListStore;
+import rdb.RdbParser;
 
 public class Main {
 
@@ -17,10 +18,10 @@ public class Main {
     ServerSocket serverSocket = null;
     Socket clientSocket = null;
     int port = 6379;
-    
+
     String dir = ".";
     String dbfilename = "dump.rdb";
-        
+
     for (int i = 0; i < args.length - 1; i++) {
       if (args[i].equals("--dir")) {
         dir = args[i + 1];
@@ -28,13 +29,21 @@ public class Main {
         dbfilename = args[i + 1];
       }
     }
-    
+
     File RDB = new File(dir, dbfilename);
     RDB.getParentFile().mkdirs();
-    
+
     KeyValueStore kv = new KeyValueStore();
     ListStore listStore = new ListStore();
     CommandHandler commandHandler = new CommandHandler(kv, listStore, RDB);
+
+    if (RDB.exists()) {
+      try {
+        RdbParser.load(RDB, kv);
+      } catch (Exception e) {
+        System.out.println("Failed to load RDB: " + e.getMessage());
+      }
+    }
 
     try {
       serverSocket = new ServerSocket(port);

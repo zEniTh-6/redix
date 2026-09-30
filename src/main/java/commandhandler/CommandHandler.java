@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
+import java.util.Set;
 
 import store.KeyValueStore;
 import store.ListStore;
@@ -305,6 +306,26 @@ public class CommandHandler {
                     out.write(("+" + type + END).getBytes());
                 } catch (IndexOutOfBoundsException e) {
                     out.write(("-ERR wrong number of arguments for 'type' command" + END).getBytes());
+                }
+                out.flush();
+            }
+            case "KEYS" -> {
+                try {
+                    String comd = commands.get(1);
+                    if (comd.equals("*")) {
+                        Set<String> allKeys = new java.util.HashSet<>();
+                        allKeys.addAll(kv.keys());
+                        allKeys.addAll(listStore.keys());
+
+                        out.write(("*" + allKeys.size() + END).getBytes());
+                        for (String key : allKeys) {
+                            out.write(("$" + key.length() + END + key + END).getBytes());
+                        }
+                    } else {
+                        out.write(("-ERR unknown command" + END).getBytes());
+                    }
+                } catch (IndexOutOfBoundsException e) {
+                    out.write(("-ERR wrong number of arguments for 'ttl' command" + END).getBytes());
                 }
                 out.flush();
             }

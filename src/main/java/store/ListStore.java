@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
+import java.util.HashSet;
 
 public class ListStore {
     private final ConcurrentHashMap<String, LinkedList<String>> list_mp = new ConcurrentHashMap<>();
@@ -113,5 +115,9 @@ public class ListStore {
         if (list_mp.containsKey(key))
             list = true;
         return list;
+    }
+
+    public Set<String> keys() {
+        return new HashSet<>(list_mp.keySet());
     }
 }
